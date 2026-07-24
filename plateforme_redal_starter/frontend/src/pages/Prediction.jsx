@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api, ZONES, riskClass } from '../api.js'
+import { api, ZONES, ZONE_COLORS, riskClass } from '../api.js'
 
 const MONTHS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
 const DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche']
@@ -46,88 +46,112 @@ export default function Prediction() {
 
   return (
     <div>
-      <div className="page-title">Prédiction en direct</div>
-      <div className="page-sub">Interroge les modèles LightGBM avec des paramètres personnalisés</div>
-
-      <div className="panel">
-        <div className="panel-head">
-          <div className="panel-title"><span className="sq"></span>Paramètres</div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">Prédiction en direct</div>
+          <div className="page-sub">Interroge les modèles LightGBM avec des paramètres personnalisés</div>
         </div>
+        <span className="badge-soft">Zone : {zone}</span>
+      </div>
 
-        <div className="tabbar" style={{ marginBottom: 16 }}>
-          <button className={'tab' + (domain === 'electricity' ? ' active' : '')} onClick={() => { setDomain('electricity'); setResult(null) }}>Électricité</button>
-          <button className={'tab' + (domain === 'water' ? ' active' : '')} onClick={() => { setDomain('water'); setResult(null) }}>Eau</button>
-        </div>
-
-        <div className="form-grid">
-          <div className="field">
-            <label>Zone</label>
-            <select value={zone} onChange={e => setZone(e.target.value)}>
-              {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
-            </select>
+      <div className="two-col">
+        <div className="panel">
+          <div className="panel-head">
+            <div className="panel-title"><span className="sq"></span>Paramètres</div>
           </div>
 
-          {domain === 'electricity' && (
-            <>
-              <div className="field">
-                <label>Température (°C)</label>
-                <input type="number" value={form.temperature} onChange={e => update('temperature', e.target.value)} />
-              </div>
-              <div className="field">
-                <label>Humidité (%)</label>
-                <input type="number" value={form.humidity} onChange={e => update('humidity', e.target.value)} />
-              </div>
-            </>
-          )}
+          <div className="tabbar" style={{ marginBottom: 18, padding: 0 }}>
+            <button className={'tab' + (domain === 'electricity' ? ' active' : '')} onClick={() => { setDomain('electricity'); setResult(null) }} style={{ borderRadius: 8 }}>Électricité</button>
+            <button className={'tab' + (domain === 'water' ? ' active' : '')} onClick={() => { setDomain('water'); setResult(null) }} style={{ borderRadius: 8 }}>Eau</button>
+          </div>
 
-          {domain === 'water' && (
+          <div className="form-grid">
             <div className="field">
-              <label>Pression réseau</label>
-              <input type="number" step="0.1" value={form.pressure} onChange={e => update('pressure', e.target.value)} />
+              <label>Zone</label>
+              <select value={zone} onChange={e => setZone(e.target.value)}>
+                {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
+              </select>
             </div>
-          )}
 
-          <div className="field">
-            <label>Mois</label>
-            <select value={form.month} onChange={e => update('month', e.target.value)}>
-              {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-            </select>
+            {domain === 'electricity' && (
+              <>
+                <div className="field">
+                  <label>Température (°C)</label>
+                  <input type="number" value={form.temperature} onChange={e => update('temperature', e.target.value)} />
+                </div>
+                <div className="field">
+                  <label>Humidité (%)</label>
+                  <input type="number" value={form.humidity} onChange={e => update('humidity', e.target.value)} />
+                </div>
+              </>
+            )}
+
+            {domain === 'water' && (
+              <div className="field">
+                <label>Pression réseau</label>
+                <input type="number" step="0.1" value={form.pressure} onChange={e => update('pressure', e.target.value)} />
+              </div>
+            )}
+
+            <div className="field">
+              <label>Mois</label>
+              <select value={form.month} onChange={e => update('month', e.target.value)}>
+                {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Jour de semaine</label>
+              <select value={form.dayofweek} onChange={e => update('dayofweek', e.target.value)}>
+                {DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Heure</label>
+              <input type="number" min="0" max="23" value={form.hour} onChange={e => update('hour', e.target.value)} />
+            </div>
           </div>
-          <div className="field">
-            <label>Jour de semaine</label>
-            <select value={form.dayofweek} onChange={e => update('dayofweek', e.target.value)}>
-              {DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-            </select>
+
+          <div style={{ marginTop: 22 }}>
+            <button className="btn" onClick={handlePredict} disabled={loading}>
+              {loading ? 'Calcul en cours…' : 'Lancer la prédiction'}
+            </button>
           </div>
-          <div className="field">
-            <label>Heure</label>
-            <input type="number" min="0" max="23" value={form.hour} onChange={e => update('hour', e.target.value)} />
+
+          {error && <div className="error-state" style={{ marginTop: 16 }}>{error}</div>}
+
+          <div className="section-divider"></div>
+          <div className="panel-note">
+            Le modèle combine ces paramètres avec l'historique récent de consommation/pression (moyennes glissantes, valeurs passées) — non modifiable ici, figé aux dernières données connues. Pour tester l'effet d'un historique anormal, utilise la page <b>What-if</b>.
           </div>
         </div>
 
-        <div style={{ marginTop: 20 }}>
-          <button className="btn" onClick={handlePredict} disabled={loading}>
-            {loading ? 'Calcul en cours…' : 'Lancer la prédiction'}
-          </button>
-        </div>
+        <div className="sticky-panel">
+          <div className="panel">
+            <div className="panel-head">
+              <div className="panel-title"><span className="sq"></span>Résultat</div>
+            </div>
 
-        {error && <div className="error-state" style={{ marginTop: 16 }}>{error}</div>}
+            {!result && !loading && (
+              <div className="empty-state">Lance une prédiction pour voir le résultat ici.</div>
+            )}
+            {loading && <div className="loading">Calcul en cours…</div>}
 
-        {result && (
-          <div className="result-box">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-              <div>
-                <div className="panel-note" style={{ marginBottom: 6 }}>
-                  Probabilité d'incident — {result.zone} · {domain === 'electricity' ? 'Électricité' : 'Eau'}
+            {result && (
+              <div className="result-box">
+                <div className="panel-note" style={{ marginBottom: 8 }}>
+                  <span className="zone-pill"><span className="d" style={{ background: ZONE_COLORS[result.zone] }}></span>{result.zone}</span>
+                  {' · '}{domain === 'electricity' ? 'Électricité' : 'Eau'}
                 </div>
                 <div className="result-proba">{(result.probability * 100).toFixed(1)}%</div>
+                <div style={{ marginTop: 12 }}>
+                  <span className={'risk-badge ' + riskClass(result.risk_level)}>
+                    <span className="dot"></span>{result.risk_level}
+                  </span>
+                </div>
               </div>
-              <span className={'risk-badge ' + riskClass(result.risk_level)}>
-                <span className="dot"></span>{result.risk_level}
-              </span>
-            </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
