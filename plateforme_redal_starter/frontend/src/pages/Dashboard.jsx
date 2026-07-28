@@ -360,12 +360,6 @@ export default function Dashboard() {
           Le statut (nominal / à surveiller / critique) classe les 3 zones <b>entre elles</b> par score de priorité — ce n'est pas un seuil absolu. Sur l'historique 2017/2018, les écarts entre zones restent faibles en moyenne annuelle ; l'écart se creuse surtout sur des journées précises.
         </div>
       </div>
-
-      <div className="panel">
-        <div className="panel-note">
-          Pour l'historique détaillé complémentaire, consulte aussi le dashboard d'analyse (redal_dashboard.html) livré séparément.
-        </div>
-      </div>
     </div>
   )
 }
