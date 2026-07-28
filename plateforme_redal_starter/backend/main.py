@@ -195,7 +195,32 @@ def get_kpis(zone: Optional[str] = None):
         "total_complaints": int(df["nb_complaints"].sum()) if "nb_complaints" in df else None,
         "avg_priority_score": float(df["priority_score_v2"].mean()) if "priority_score_v2" in df else float(df["priority_score"].mean()),
         "days_covered": int(df["date"].nunique()),
+        # Décomposition du score de priorité (3 signaux pondérés) — pour audit/transparence
+        "priority_breakdown": {
+            "incident_component": float(df["incident_rate"].mean() * 0.5) if "incident_rate" in df else None,
+            "risk_cluster_component": float(df["risk_cluster"].mean() * 0.25) if "risk_cluster" in df else None,
+            "complaints_component": float(df["complaints_norm"].mean() * 0.25) if "complaints_norm" in df else None,
+            "risk_cluster_share": float(df["risk_cluster"].mean()) if "risk_cluster" in df else None,
+            "avg_complaints_norm": float(df["complaints_norm"].mean()) if "complaints_norm" in df else None,
+        },
     }
+
+
+@app.get("/api/timeseries")
+def get_timeseries(zone: Optional[str] = None):
+    """Retourne la série journalière (conso, incidents, réclamations, score) pour les graphiques de tendance."""
+    df = ZONE_DAY if zone in (None, "ALL") else ZONE_DAY[ZONE_DAY["zone"] == zone]
+    if zone not in (None, "ALL"):
+        _validate_zone(zone)
+
+    df = df.sort_values("date")
+    priority_col = "priority_score_v2" if "priority_score_v2" in df.columns else "priority_score"
+    cols = ["date", "zone", "conso_mean", "incident_rate", priority_col]
+    if "nb_complaints" in df.columns:
+        cols.append("nb_complaints")
+
+    out = df[cols].rename(columns={priority_col: "priority_score"})
+    return {"zone": zone or "ALL", "series": out.to_dict(orient="records")}
 
 
 @app.get("/api/zones")

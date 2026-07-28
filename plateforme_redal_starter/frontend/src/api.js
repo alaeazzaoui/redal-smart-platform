@@ -23,6 +23,7 @@ export const api = {
     method: 'POST', body: JSON.stringify(payload),
   }),
   alerts: (threshold) => request(`/api/alerts?threshold=${threshold}`),
+  timeseries: (zone) => request(`/api/timeseries${zone ? `?zone=${encodeURIComponent(zone)}` : ''}`),
   whatif: (payload) => request('/api/whatif', {
     method: 'POST', body: JSON.stringify(payload),
   }),

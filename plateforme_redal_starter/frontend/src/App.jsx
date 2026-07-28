@@ -45,7 +45,7 @@ export default function App() {
       <header className="top-nav">
         <div className="top-nav-inner">
           <div className="brand">
-            <div className="brand-mark">RD</div>
+            <img src="/redal-logo.png" alt="Redal" className="brand-mark-img" />
             <div className="brand-text">
               <div className="eyebrow">Direction Technique · Rabat-Salé-Kénitra</div>
               <h1>REDAL <span className="thin">/ Plateforme Intelligente</span></h1>
