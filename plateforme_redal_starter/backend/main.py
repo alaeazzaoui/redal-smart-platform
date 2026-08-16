@@ -302,28 +302,88 @@ def whatif(req: WhatIfRequest):
 # ---------------------------------------------------------------------------
 @app.get("/api/report")
 def get_report(zone: Optional[str] = None, days: int = 30):
-    df = ZONE_DAY if zone in (None, "ALL") else ZONE_DAY[ZONE_DAY["zone"] == zone]
+    df_all = ZONE_DAY.copy()
+    df_all["date"] = pd.to_datetime(df_all["date"])
+    priority_col = "priority_score_v2" if "priority_score_v2" in df_all.columns else "priority_score"
+
+    df = df_all if zone in (None, "ALL") else df_all[df_all["zone"] == zone]
     if zone not in (None, "ALL"):
         _validate_zone(zone)
 
-    df = df.copy()
-    df["date"] = pd.to_datetime(df["date"])
-    cutoff = df["date"].max() - timedelta(days=days)
-    recent = df[df["date"] >= cutoff]
+    max_date = df["date"].max()
+    cutoff = max_date - timedelta(days=days)
+    prev_cutoff = cutoff - timedelta(days=days)
 
-    top_priority_col = "priority_score_v2" if "priority_score_v2" in recent.columns else "priority_score"
-    top_days = recent.sort_values(top_priority_col, ascending=False).head(10)
+    recent = df[df["date"] >= cutoff]
+    previous = df[(df["date"] >= prev_cutoff) & (df["date"] < cutoff)]
+
+    def summarize(d):
+        if len(d) == 0:
+            return {"avg_incident_rate": None, "avg_conso": None, "total_complaints": None,
+                    "avg_priority_score": None, "risk_cluster_share": None}
+        return {
+            "avg_incident_rate": float(d["incident_rate"].mean()),
+            "avg_conso": float(d["conso_mean"].mean()),
+            "total_complaints": int(d["nb_complaints"].sum()) if "nb_complaints" in d else None,
+            "avg_priority_score": float(d[priority_col].mean()),
+            "risk_cluster_share": float(d["risk_cluster"].mean()) if "risk_cluster" in d else None,
+        }
+
+    summary_current = summarize(recent)
+    summary_previous = summarize(previous)
+
+    def delta(cur, prev):
+        if cur is None or prev is None or prev == 0:
+            return None
+        return (cur - prev) / prev
+
+    deltas = {
+        k: delta(summary_current[k], summary_previous[k])
+        for k in ["avg_incident_rate", "avg_conso", "total_complaints", "avg_priority_score"]
+    }
+
+    top_days = recent.sort_values(priority_col, ascending=False).head(10)
+
+    # Détail par zone sur la période (utile surtout quand zone == ALL)
+    zone_breakdown = []
+    for z in ZONES:
+        zd = recent[recent["zone"] == z]
+        if len(zd) == 0:
+            continue
+        zone_breakdown.append({
+            "zone": z,
+            "avg_incident_rate": float(zd["incident_rate"].mean()),
+            "avg_conso": float(zd["conso_mean"].mean()),
+            "total_complaints": int(zd["nb_complaints"].sum()) if "nb_complaints" in zd else None,
+            "avg_priority_score": float(zd[priority_col].mean()),
+        })
+    zone_breakdown.sort(key=lambda r: r["avg_priority_score"], reverse=True)
+
+    # Génération d'une courte analyse textuelle automatique
+    insights = []
+    if zone in (None, "ALL") and len(zone_breakdown) > 0:
+        top_zone = zone_breakdown[0]
+        insights.append(f"{top_zone['zone']} affiche le score de priorité le plus élevé de la période ({top_zone['avg_priority_score']:.4f}).")
+    if deltas["avg_incident_rate"] is not None:
+        direction = "en hausse" if deltas["avg_incident_rate"] > 0 else "en baisse"
+        insights.append(f"Le taux d'incident moyen est {direction} de {abs(deltas['avg_incident_rate'])*100:.1f}% par rapport à la période précédente équivalente.")
+    if deltas["total_complaints"] is not None:
+        direction = "en hausse" if deltas["total_complaints"] > 0 else "en baisse"
+        insights.append(f"Les réclamations sont {direction} de {abs(deltas['total_complaints'])*100:.1f}% sur la même base de comparaison.")
+    if summary_current["risk_cluster_share"] is not None:
+        insights.append(f"{summary_current['risk_cluster_share']*100:.1f}% des journées de la période appartiennent au cluster à risque élevé.")
 
     return {
         "period_days": days,
         "zone": zone or "ALL",
         "generated_at": datetime.now().isoformat(),
-        "summary": {
-            "avg_incident_rate": float(recent["incident_rate"].mean()),
-            "avg_conso": float(recent["conso_mean"].mean()),
-            "total_complaints": int(recent["nb_complaints"].sum()) if "nb_complaints" in recent else None,
-        },
-        "top_priority_days": top_days[["date", "zone", "incident_rate", top_priority_col]].assign(
-            date=lambda d: d["date"].dt.strftime("%Y-%m-%d")
-        ).to_dict(orient="records"),
+        "period_range": {"from": cutoff.strftime("%Y-%m-%d"), "to": max_date.strftime("%Y-%m-%d")},
+        "summary": summary_current,
+        "previous_summary": summary_previous,
+        "deltas": deltas,
+        "zone_breakdown": zone_breakdown,
+        "insights": insights,
+        "top_priority_days": top_days[["date", "zone", "incident_rate", priority_col]].rename(
+            columns={priority_col: "priority_score"}
+        ).assign(date=lambda d: d["date"].dt.strftime("%Y-%m-%d")).to_dict(orient="records"),
     }

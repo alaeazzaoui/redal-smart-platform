@@ -27,8 +27,8 @@ function fmtPct(n, d = 2) {
   return (n * 100).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%'
 }
 function riskTierFromRank(rank) {
-  if (rank === 2) return { label: 'critique', color: '#C0392B' }
-  if (rank === 1) return { label: 'à surveiller', color: '#C77B1E' }
+  if (rank === 2) return { label: 'critique', color: '#7A241C' }
+  if (rank === 1) return { label: 'à surveiller', color: '#C0392B' }
   return { label: 'nominal', color: '#2E8B63' }
 }
 
@@ -282,7 +282,7 @@ export default function Dashboard() {
       <div className="panel">
         <div className="panel-head">
           <div className="panel-title"><span className="sq"></span>Tendance de consommation électrique</div>
-          <div className="panel-note">Moyenne mobile 7 jours</div>
+          <div className="panel-note">Moyenne mobile 7 jours · Tétouan 2017</div>
         </div>
         {Object.keys(timeseries).length > 0 ? (
           <>
@@ -358,6 +358,12 @@ export default function Dashboard() {
       <div className="panel">
         <div className="panel-note">
           Le statut (nominal / à surveiller / critique) classe les 3 zones <b>entre elles</b> par score de priorité — ce n'est pas un seuil absolu. Sur l'historique 2017/2018, les écarts entre zones restent faibles en moyenne annuelle ; l'écart se creuse surtout sur des journées précises.
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-note">
+          Pour l'historique détaillé complémentaire, consulte aussi le dashboard d'analyse (redal_dashboard.html) livré séparément.
         </div>
       </div>
     </div>
