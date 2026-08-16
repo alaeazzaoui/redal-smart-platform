@@ -2,7 +2,7 @@
 
 Plateforme intelligente de prévision d'incidents, segmentation clients et pilotage décisionnel par zone géographique, développée dans le cadre d'un stage d'été à la Direction Technique de Redal (gestionnaire délégué eau/électricité/assainissement, région Rabat-Salé-Kénitra).
 
-**Étudiante** : Alae AZZAOUI — EMSI Rabat
+**Étudiants** : Alae AZZAOUI et Saad BERRHOUT — EMSI Rabat
 **Période** : Juillet – Août 2026
 
 ---
@@ -106,7 +106,7 @@ Rapport périodique détaillé : anneaux de pourcentage, barres comparatives (p�
 ### Backend
 
 ```bash
-cd backend
+cd plateforme_redal_starter/backend
 pip install -r requirements.txt
 python -m uvicorn main:app --reload --port 8000
 ```
@@ -116,7 +116,7 @@ L'API est accessible sur `http://127.0.0.1:8000`, documentation interactive sur 
 ### Frontend
 
 ```bash
-cd frontend
+cd plateforme_redal_starter/frontend
 npm install
 npm run dev
 ```
@@ -130,38 +130,45 @@ L'application est accessible sur `http://localhost:5173`.
 ## Structure des fichiers
 
 ```
-├── backend/
-│   ├── main.py                  # API FastAPI (tous les endpoints)
-│   ├── requirements.txt
-│   ├── models/
-│   │   ├── elec_models.pkl      # LightGBM par zone, électricité
-│   │   ├── water_models.pkl     # LightGBM par zone, eau
-│   │   ├── elec_reference.csv   # Dernières valeurs connues (features de lag)
-│   │   └── water_reference.csv
-│   └── data/
-│       ├── zone_day_summary.csv     # Agrégat zone-jour (clusters, scores, réclamations)
-│       ├── elec_detail.csv          # Détail électricité (10 min)
-│       ├── water_detail.csv         # Détail eau (5 min)
-│       └── client_segmentation.csv  # 150 clients synthétiques
+├── data/
+│   └── raw/                         # Données sources brutes (audit et EDA)
 │
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx              # Layout + navigation
-│   │   ├── api.js               # Client API
-│   │   ├── styles.css           # Thème clair/sombre
-│   │   └── pages/
-│   │       ├── Dashboard.jsx
-│   │       ├── Prediction.jsx
-│   │       ├── Alerts.jsx
-│   │       ├── WhatIf.jsx
-│   │       └── Reporting.jsx
-│   └── public/
-│       └── redal-logo.png
-│
-├── notebook/
+├── notebooks/
 │   └── Plateforme_Intelligente_Redal.ipynb   # Pipeline complet (EDA → modèles → exports)
 │
-└── redal_dashboard.html          # Dashboard HTML autonome (sans backend requis)
+├── outputs/                         # Exports générés par le notebook (CSV, modèles)
+│
+├── plateforme_redal_starter/
+│   ├── backend/
+│   │   ├── main.py                  # API FastAPI (tous les endpoints)
+│   │   ├── requirements.txt
+│   │   ├── models/
+│   │   │   ├── elec_models.pkl      # LightGBM par zone, électricité
+│   │   │   ├── water_models.pkl     # LightGBM par zone, eau
+│   │   │   ├── elec_reference.csv   # Dernières valeurs connues (features de lag)
+│   │   │   └── water_reference.csv
+│   │   └── data/
+│   │       ├── zone_day_summary.csv     # Agrégat zone-jour (clusters, scores, réclamations)
+│   │       ├── elec_detail.csv          # Détail électricité (10 min)
+│   │       ├── water_detail.csv         # Détail eau (5 min)
+│   │       └── client_segmentation.csv  # 150 clients synthétiques
+│   │
+│   └── frontend/
+│       ├── src/
+│       │   ├── App.jsx              # Layout + navigation
+│       │   ├── api.js               # Client API
+│       │   ├── styles.css           # Thème clair/sombre
+│       │   └── pages/
+│       │       ├── Dashboard.jsx
+│       │       ├── Prediction.jsx
+│       │       ├── Alerts.jsx
+│       │       ├── WhatIf.jsx
+│       │       └── Reporting.jsx
+│       └── public/
+│           └── redal-logo.png
+│
+├── redal_dashboard.html             # Dashboard HTML autonome (sans backend requis)
+└── README.md
 ```
 
 ---
