@@ -28,6 +28,7 @@ export const api = {
     method: 'POST', body: JSON.stringify(payload),
   }),
   report: (zone, days) => request(`/api/report?days=${days}${zone ? `&zone=${encodeURIComponent(zone)}` : ''}`),
+  reportPdfUrl: (zone, days) => `${API_BASE}/api/report/pdf?days=${days}${zone ? `&zone=${encodeURIComponent(zone)}` : ''}`,
 }
 
 export const ZONES = ['Zone A', 'Zone B', 'Zone C']

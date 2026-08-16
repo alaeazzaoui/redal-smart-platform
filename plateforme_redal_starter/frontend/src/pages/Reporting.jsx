@@ -18,10 +18,63 @@ function fmtDelta(n) {
 function DeltaTag({ value, invert = false }) {
   const d = fmtDelta(value)
   if (!d) return <span className="panel-note">vs période préc. : —</span>
-  // invert=true pour les métriques où une baisse est une mauvaise nouvelle (rare ici) ; par défaut hausse = rouge, baisse = vert
   const bad = invert ? d.negative : d.positive
   const color = d.text === '+0.0%' || d.text === '-0.0%' ? 'var(--text-faint)' : (bad ? 'var(--redal)' : 'var(--ok)')
   return <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color, fontWeight: 600 }}>{d.text} vs période préc.</span>
+}
+
+// Anneau de pourcentage (façon donut chart)
+function PercentRing({ value, label, sub, size = 110, stroke = 10, color = 'var(--redal)' }) {
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const pct = Math.max(0, Math.min(1, value || 0))
+  const offset = circ * (1 - pct)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border-soft)" strokeWidth={stroke} />
+        <circle
+          cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          transform={`rotate(-90 ${size/2} ${size/2})`}
+          style={{ transition: 'stroke-dashoffset .5s ease' }}
+        />
+        <text x="50%" y="48%" textAnchor="middle" dominantBaseline="middle" fontFamily="IBM Plex Mono" fontSize="20" fontWeight="700" fill="var(--text)">
+          {(pct * 100).toFixed(1)}%
+        </text>
+      </svg>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>{sub}</div>}
+      </div>
+    </div>
+  )
+}
+
+// Barre comparative (période actuelle vs précédente)
+function CompareBar({ label, current, previous, format = (v) => fmt(v), color = 'var(--redal)' }) {
+  const max = Math.max(current || 0, previous || 0) || 1
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>
+        <span style={{ fontWeight: 600, color: 'var(--text)' }}>{label}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
+        <span style={{ width: 62, fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--text-faint)' }}>Actuelle</span>
+        <div style={{ flex: 1, height: 10, background: 'var(--border-soft)', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ width: `${(current / max) * 100}%`, height: '100%', background: color, borderRadius: 4 }}></div>
+        </div>
+        <span style={{ width: 70, fontSize: 11.5, fontFamily: 'var(--font-mono)', textAlign: 'right', color: 'var(--text)' }}>{format(current)}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ width: 62, fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--text-faint)' }}>Précédente</span>
+        <div style={{ flex: 1, height: 10, background: 'var(--border-soft)', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ width: `${(previous / max) * 100}%`, height: '100%', background: 'var(--text-faint)', borderRadius: 4 }}></div>
+        </div>
+        <span style={{ width: 70, fontSize: 11.5, fontFamily: 'var(--font-mono)', textAlign: 'right', color: 'var(--text-dim)' }}>{format(previous)}</span>
+      </div>
+    </div>
+  )
 }
 
 export default function Reporting() {
@@ -31,6 +84,29 @@ export default function Reporting() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+
+  async function downloadPdf() {
+    setDownloadingPdf(true)
+    try {
+      const url = api.reportPdfUrl(zone === 'ALL' ? null : zone, days)
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`Erreur (${res.status})`)
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      const objUrl = URL.createObjectURL(blob)
+      a.href = objUrl
+      a.download = `rapport_redal_${zone === 'ALL' ? 'toutes_zones' : zone.replace(' ', '_')}_${days}j.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(objUrl)
+    } catch (e) {
+      setError('Échec du téléchargement PDF : ' + e.message)
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
 
   async function generate() {
     setLoading(true)
@@ -89,38 +165,51 @@ export default function Reporting() {
           <div className="panel">
             <div className="panel-head">
               <div className="panel-title"><span className="sq"></span>Rapport — {report.zone === 'ALL' ? 'Toutes zones' : report.zone}</div>
-              <div className="panel-note">
-                Période du {new Date(report.period_range.from).toLocaleDateString('fr-FR')} au {new Date(report.period_range.to).toLocaleDateString('fr-FR')}
-                {' · '}Généré à {new Date(report.generated_at).toLocaleTimeString('fr-FR')}
-              </div>
+              <button className="btn btn-secondary" onClick={downloadPdf} disabled={downloadingPdf} style={{ fontSize: 12.5, padding: '8px 16px' }}>
+                {downloadingPdf ? 'Génération PDF…' : '⬇ Télécharger en PDF'}
+              </button>
+            </div>
+            <div className="panel-note" style={{ marginTop: -8, marginBottom: 12 }}>
+              Période du {new Date(report.period_range.from).toLocaleDateString('fr-FR')} au {new Date(report.period_range.to).toLocaleDateString('fr-FR')}
+              {' · '}Généré à {new Date(report.generated_at).toLocaleTimeString('fr-FR')}
             </div>
 
-            <div className="stat-strip">
-              <div className="stat-item">
-                <div className="stat-label">Taux incident moyen</div>
-                <div className="stat-value">{fmtPct(report.summary.avg_incident_rate)}</div>
-                <div className="stat-delta"><DeltaTag value={report.deltas.avg_incident_rate} /></div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">Conso. moyenne</div>
-                <div className="stat-value">{fmt(report.summary.avg_conso / 1000, 1)}<span className="unit">MWh/j</span></div>
-                <div className="stat-delta"><DeltaTag value={report.deltas.avg_conso} /></div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">Réclamations</div>
-                <div className="stat-value">{fmt(report.summary.total_complaints)}</div>
-                <div className="stat-delta"><DeltaTag value={report.deltas.total_complaints} /></div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">Score priorité moyen</div>
-                <div className="stat-value">{report.summary.avg_priority_score?.toFixed(4)}</div>
-                <div className="stat-delta"><DeltaTag value={report.deltas.avg_priority_score} /></div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">Jours à risque</div>
-                <div className="stat-value">{fmtPct(report.summary.risk_cluster_share, 1)}</div>
-                <div className="stat-delta panel-note">Part du cluster à risque élevé</div>
-              </div>
+            <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', justifyContent: 'space-around', padding: '10px 0 6px' }}>
+              <PercentRing
+                value={report.summary.avg_incident_rate}
+                label="Taux incident moyen"
+                sub={<DeltaTag value={report.deltas.avg_incident_rate} />}
+                color="var(--redal)"
+              />
+              <PercentRing
+                value={report.summary.risk_cluster_share}
+                label="Jours à risque"
+                sub="Part du cluster à risque"
+                color="#7A241C"
+              />
+            </div>
+
+            <div className="section-divider"></div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '4px 28px' }}>
+              <CompareBar
+                label="Consommation moyenne (kWh/j)"
+                current={report.summary.avg_conso}
+                previous={report.previous_summary.avg_conso}
+                format={v => fmt(v)}
+              />
+              <CompareBar
+                label="Réclamations (total)"
+                current={report.summary.total_complaints}
+                previous={report.previous_summary.total_complaints}
+                format={v => fmt(v)}
+              />
+              <CompareBar
+                label="Score priorité moyen"
+                current={report.summary.avg_priority_score}
+                previous={report.previous_summary.avg_priority_score}
+                format={v => v?.toFixed(4)}
+              />
             </div>
           </div>
 

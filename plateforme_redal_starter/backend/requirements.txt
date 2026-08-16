@@ -6,3 +6,4 @@ numpy>=2.1.0
 scikit-learn>=1.5.2
 pydantic>=2.6
 python-multipart>=0.0.9
+fpdf2>=2.7

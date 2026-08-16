@@ -300,8 +300,7 @@ def whatif(req: WhatIfRequest):
 # ---------------------------------------------------------------------------
 # Endpoints — Reporting
 # ---------------------------------------------------------------------------
-@app.get("/api/report")
-def get_report(zone: Optional[str] = None, days: int = 30):
+def _build_report_data(zone: Optional[str], days: int) -> dict:
     df_all = ZONE_DAY.copy()
     df_all["date"] = pd.to_datetime(df_all["date"])
     priority_col = "priority_score_v2" if "priority_score_v2" in df_all.columns else "priority_score"
@@ -344,7 +343,6 @@ def get_report(zone: Optional[str] = None, days: int = 30):
 
     top_days = recent.sort_values(priority_col, ascending=False).head(10)
 
-    # Détail par zone sur la période (utile surtout quand zone == ALL)
     zone_breakdown = []
     for z in ZONES:
         zd = recent[recent["zone"] == z]
@@ -359,7 +357,6 @@ def get_report(zone: Optional[str] = None, days: int = 30):
         })
     zone_breakdown.sort(key=lambda r: r["avg_priority_score"], reverse=True)
 
-    # Génération d'une courte analyse textuelle automatique
     insights = []
     if zone in (None, "ALL") and len(zone_breakdown) > 0:
         top_zone = zone_breakdown[0]
@@ -387,3 +384,172 @@ def get_report(zone: Optional[str] = None, days: int = 30):
             columns={priority_col: "priority_score"}
         ).assign(date=lambda d: d["date"].dt.strftime("%Y-%m-%d")).to_dict(orient="records"),
     }
+
+
+@app.get("/api/report")
+def get_report(zone: Optional[str] = None, days: int = 30):
+    return _build_report_data(zone, days)
+
+
+@app.get("/api/report/pdf")
+def get_report_pdf(zone: Optional[str] = None, days: int = 30):
+    from fpdf import FPDF
+    from fastapi.responses import Response
+
+    data = _build_report_data(zone, days)
+
+    def pct(v, d=2):
+        return f"{v*100:.{d}f}%" if v is not None else "—"
+
+    def num(v, d=0):
+        return f"{v:,.{d}f}".replace(",", " ") if v is not None else "—"
+
+    def delta_str(v):
+        if v is None:
+            return "—"
+        return f"{'+' if v>0 else ''}{v*100:.1f}% vs période précédente"
+
+    REDAL = (192, 57, 43)
+    DARK = (24, 28, 34)
+    GRAY = (91, 101, 112)
+    LIGHT_BG = (251, 244, 243)
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.add_page()
+
+    # En-tête
+    pdf.set_fill_color(*REDAL)
+    pdf.rect(0, 0, 210, 22, 'F')
+    pdf.set_xy(12, 6)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 15)
+    pdf.cell(0, 6, "REDAL - Plateforme Intelligente", ln=1)
+    pdf.set_x(12)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 5, "Direction Technique - Rabat-Sale-Kenitra", ln=1)
+
+    pdf.set_xy(12, 30)
+    pdf.set_text_color(*DARK)
+    pdf.set_font("Helvetica", "B", 16)
+    zone_label = "Toutes zones" if data["zone"] == "ALL" else data["zone"]
+    pdf.cell(0, 8, f"Rapport periodique - {zone_label}", ln=1)
+    pdf.set_x(12)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(*GRAY)
+    pdf.cell(0, 6, f"Periode du {data['period_range']['from']} au {data['period_range']['to']}  |  Genere le {datetime.now().strftime('%d/%m/%Y a %H:%M')}", ln=1)
+    pdf.ln(4)
+
+    # KPIs
+    pdf.set_x(12)
+    pdf.set_fill_color(*LIGHT_BG)
+    pdf.set_draw_color(230, 230, 230)
+    kpis = [
+        ("Taux incident moyen", pct(data["summary"]["avg_incident_rate"]), delta_str(data["deltas"]["avg_incident_rate"])),
+        ("Conso. moyenne", num(data["summary"]["avg_conso"]) + " kWh/j", delta_str(data["deltas"]["avg_conso"])),
+        ("Reclamations", num(data["summary"]["total_complaints"]), delta_str(data["deltas"]["total_complaints"])),
+        ("Score priorite moyen", f"{data['summary']['avg_priority_score']:.4f}" if data["summary"]["avg_priority_score"] is not None else "—", delta_str(data["deltas"]["avg_priority_score"])),
+    ]
+    col_w = 46.5
+    x0 = 12
+    y0 = pdf.get_y()
+    box_h = 24
+    for i, (label, value, delta) in enumerate(kpis):
+        x = x0 + i * col_w
+        pdf.rect(x, y0, col_w - 2, box_h, style='DF')
+        pdf.set_xy(x + 2, y0 + 2)
+        pdf.set_font("Helvetica", "", 7.5)
+        pdf.set_text_color(*GRAY)
+        pdf.cell(col_w - 4, 4, label.upper(), ln=0)
+        pdf.set_xy(x + 2, y0 + 9)
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.set_text_color(*DARK)
+        pdf.cell(col_w - 4, 6, value, ln=0)
+        pdf.set_xy(x + 2, y0 + 18)
+        pdf.set_font("Helvetica", "", 6.5)
+        pdf.set_text_color(*REDAL)
+        pdf.cell(col_w - 4, 4, delta[:28], ln=0)
+    pdf.set_xy(12, y0 + box_h + 8)
+
+    # Analyse
+    pdf.set_x(12)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(*DARK)
+    pdf.cell(0, 8, "Analyse de la periode", ln=1)
+    pdf.set_font("Helvetica", "", 9.5)
+    pdf.set_text_color(*DARK)
+    for insight in data["insights"]:
+        pdf.set_x(14)
+        clean = insight.encode('latin-1', 'replace').decode('latin-1')
+        pdf.multi_cell(0, 5.5, f"- {clean}")
+    pdf.ln(2)
+
+    # Détail par zone
+    if data["zone_breakdown"] and len(data["zone_breakdown"]) > 1:
+        pdf.set_x(12)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 9, "Detail par zone", ln=1)
+        pdf.set_x(12)
+        pdf.set_fill_color(*DARK)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 8.5)
+        headers = ["Zone", "Taux incident", "Conso. moyenne", "Reclamations", "Score priorite"]
+        widths = [30, 35, 40, 35, 40]
+        for h, w in zip(headers, widths):
+            pdf.cell(w, 7, h, border=0, fill=True)
+        pdf.ln()
+        pdf.set_font("Helvetica", "", 8.5)
+        pdf.set_text_color(*DARK)
+        for i, row in enumerate(data["zone_breakdown"]):
+            pdf.set_x(12)
+            pdf.set_fill_color(*LIGHT_BG if i % 2 == 0 else (255, 255, 255))
+            pdf.cell(widths[0], 7, row["zone"], border='B', fill=True)
+            pdf.cell(widths[1], 7, pct(row["avg_incident_rate"]), border='B', fill=True)
+            pdf.cell(widths[2], 7, num(row["avg_conso"]), border='B', fill=True)
+            pdf.cell(widths[3], 7, num(row["total_complaints"]), border='B', fill=True)
+            pdf.cell(widths[4], 7, f"{row['avg_priority_score']:.4f}", border='B', fill=True)
+            pdf.ln()
+        pdf.ln(4)
+
+    # Top jours prioritaires
+    pdf.set_x(12)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(*DARK)
+    pdf.cell(0, 9, "Top 10 jours prioritaires", ln=1)
+    pdf.set_x(12)
+    pdf.set_fill_color(*DARK)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 8.5)
+    headers2 = ["Date", "Zone", "Taux incident", "Score priorite"]
+    widths2 = [40, 35, 40, 40]
+    for h, w in zip(headers2, widths2):
+        pdf.cell(w, 7, h, fill=True)
+    pdf.ln()
+    pdf.set_font("Helvetica", "", 8.5)
+    pdf.set_text_color(*DARK)
+    for i, row in enumerate(data["top_priority_days"]):
+        pdf.set_x(12)
+        pdf.set_fill_color(*LIGHT_BG if i % 2 == 0 else (255, 255, 255))
+        pdf.cell(widths2[0], 7, row["date"], border='B', fill=True)
+        pdf.cell(widths2[1], 7, row["zone"], border='B', fill=True)
+        pdf.cell(widths2[2], 7, pct(row["incident_rate"], 1), border='B', fill=True)
+        pdf.cell(widths2[3], 7, f"{row['priority_score']:.3f}", border='B', fill=True)
+        pdf.ln()
+
+    # Pied de page méthodologique
+    pdf.ln(8)
+    pdf.set_x(12)
+    pdf.set_font("Helvetica", "I", 7.5)
+    pdf.set_text_color(*GRAY)
+    note = ("Donnees de substitution (Tetouan Power Consumption + BattLeDIM 2020) en l'absence de donnees "
+            "operationnelles reelles Redal. Referentiel de zones fictif A/B/C. Voir documentation du projet "
+            "pour le detail methodologique complet.")
+    pdf.multi_cell(0, 4, note)
+
+    pdf_bytes = bytes(pdf.output())
+    filename = f"rapport_redal_{zone_label.replace(' ','_')}_{days}j.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
