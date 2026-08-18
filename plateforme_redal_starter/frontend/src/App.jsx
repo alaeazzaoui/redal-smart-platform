@@ -33,6 +33,12 @@ const NAV_ITEMS = [
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState('checking') // checking | ok | down
+  const [theme, setTheme] = useState(() => localStorage.getItem('redal-theme') || 'light')
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('redal-theme', theme)
+  }, [theme])
 
   useEffect(() => {
     api.health()
@@ -45,18 +51,24 @@ export default function App() {
       <header className="top-nav">
         <div className="top-nav-inner">
           <div className="brand">
-            <img src="/redal-logo.png" alt="Redal" className="brand-mark-img" />
+            <img src="/redal-logo.png" alt="Redal" className="brand-mark-img light-only" />
+            <img src="/redal-logo-white.png" alt="Redal" className="brand-mark-img dark-only" />
             <div className="brand-text">
               <div className="eyebrow">Direction Technique · Rabat-Salé-Kénitra</div>
               <h1>REDAL <span className="thin">/ Plateforme Intelligente</span></h1>
             </div>
           </div>
 
-          <div className={'api-status ' + apiStatus}>
-            <span className="api-dot"></span>
-            {apiStatus === 'ok' && 'API connectée'}
-            {apiStatus === 'down' && 'API hors ligne'}
-            {apiStatus === 'checking' && 'Connexion…'}
+          <div className="header-actions">
+            <button className="theme-toggle" onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')} aria-label="Basculer le thème">
+              <span className="knob">{theme === 'dark' ? '🌙' : '☀️'}</span>
+            </button>
+            <div className={'api-status ' + apiStatus}>
+              <span className="api-dot"></span>
+              {apiStatus === 'ok' && 'API connectée'}
+              {apiStatus === 'down' && 'API hors ligne'}
+              {apiStatus === 'checking' && 'Connexion…'}
+            </div>
           </div>
         </div>
 

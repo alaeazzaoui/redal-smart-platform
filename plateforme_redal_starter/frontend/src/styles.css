@@ -13,19 +13,19 @@
   --zoneC:#2E8B63;
   --elec:#C77B1E;
   --water:#2F8AA8;
-  --redal:#C0392B;
-  --redal-dark:#9A2E22;
-  --redal-light:#E8574A;
+  --redal:#7A2140;
+  --redal-dark:#5C1930;
+  --redal-light:#96385A;
   --ok:#2E8B63;
-  --danger:#C0392B;
-  /* Échelle de risque : vert = nominal, dégradé de rouge pour les niveaux d'alerte */
+  --danger:#7A2140;
+  /* Échelle de risque : vert = nominal, dégradé de bordeaux pour les niveaux d'alerte */
   --risk-1:#DCF0E6;
   --risk-1-text:#227A55;
-  --risk-2:#E0897A;
-  --risk-2-text:#7A2E20;
-  --risk-3:#C0392B;
+  --risk-2:#C98CA0;
+  --risk-2-text:#5C1930;
+  --risk-3:#7A2140;
   --risk-3-text:#FFFFFF;
-  --risk-4:#7A241C;
+  --risk-4:#4A1526;
   --risk-4-text:#FFFFFF;
   --font-sans:'IBM Plex Sans',-apple-system,sans-serif;
   --font-mono:'IBM Plex Mono',ui-monospace,monospace;
@@ -35,32 +35,32 @@
 }
 
 [data-theme='dark']{
-  --bg:#1C0E10;
-  --bg-elevated:#261416;
-  --panel:#2B171A;
-  --panel-2:#33191C;
-  --border:#452226;
-  --border-soft:#3A1D20;
-  --text:#F3E9E7;
-  --text-dim:#C4A7A3;
-  --text-faint:#8A6A66;
+  --bg:#121317;
+  --bg-elevated:#1A1B1F;
+  --panel:#1C1D22;
+  --panel-2:#232429;
+  --border:#2E3036;
+  --border-soft:#25272C;
+  --text:#EDEDEF;
+  --text-dim:#A8ABB3;
+  --text-faint:#6B6E76;
   --zoneA:#6FA8DC;
-  --zoneB:#E8776A;
+  --zoneB:#E0574C;
   --zoneC:#5CBE8E;
   --elec:#E0A548;
   --water:#57ACC9;
-  --redal:#D2483C;
-  --redal-dark:#A8362B;
-  --redal-light:#F16C5C;
+  --redal:#E0574C;
+  --redal-dark:#B5433A;
+  --redal-light:#EC7A6F;
   --ok:#5CBE8E;
-  --danger:#E8776A;
+  --danger:#E0574C;
   --risk-1:#1E3A2C;
   --risk-1-text:#6ED0A0;
-  --risk-2:#7A362B;
-  --risk-2-text:#F3D3CB;
-  --risk-3:#C0392B;
+  --risk-2:#4A2822;
+  --risk-2-text:#E8A79E;
+  --risk-3:#7A2E24;
   --risk-3-text:#FFFFFF;
-  --risk-4:#8E241A;
+  --risk-4:#8B2318;
   --risk-4-text:#FFFFFF;
   --shadow-sm:0 1px 2px rgba(0,0,0,0.3);
 }
@@ -81,10 +81,9 @@ html,body,#root{min-height:100%;background:var(--bg);color:var(--text);font-fami
 }
 .brand{display:flex;align-items:center;gap:14px;}
 .brand-mark-img{height:38px;width:auto;object-fit:contain;flex-shrink:0;}
-[data-theme='dark'] .brand-mark-img{
-  filter:brightness(0) invert(1);
-  background:#fff;padding:5px 9px;border-radius:5px;
-}
+.brand-mark-img.dark-only{display:none;}
+[data-theme='dark'] .brand-mark-img.light-only{display:none;}
+[data-theme='dark'] .brand-mark-img.dark-only{display:block;}
 .brand-text .eyebrow{
   font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;
   color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;
